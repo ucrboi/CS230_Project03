@@ -21,11 +21,10 @@ void drawCircle(float cx, float cy, float r, int num_segments)
     glEnd();
 }
 
-void controls(GLFWwindow *window, float *camScale, float *camX, float *camY, float resetScaleValue)
+void controls(GLFWwindow *window, float *camScale, float *camX, float *camY, float resetScaleValue, bool *shouldMove)
 {
-    // Process keyboard input for interactivity
     float panSpeed = *camScale * 0.01f; // Pan speed is proportional to the current zoom
-    float zoomSpeed = 0.2f;             // Fixed zoom speed
+    float zoomSpeed = 1.0f;             // Fixed zoom speed
 
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
         *camX -= panSpeed;
@@ -40,6 +39,11 @@ void controls(GLFWwindow *window, float *camScale, float *camX, float *camY, flo
         *camScale -= zoomSpeed;
     if (glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS)
         *camScale += zoomSpeed;
+
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+    {
+        *shouldMove = !*shouldMove;
+    }
 
     // Reset view when "0" is pressed
     if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS)

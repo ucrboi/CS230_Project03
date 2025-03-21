@@ -1,85 +1,32 @@
+#define GLM_ENABLE_EXPERIMENTAL
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <vector>
+#include <glm/gtx/norm.hpp>
+
 #include <random>
-#include <cmath>
 #include <iostream>
-#include "bodies.h"
-#include "physics.h"
+
+#include "body.h"
+#include "simulation.h"
 #include "utils.h"
 
 const GLuint WIDTH = 1024, HEIGHT = 768;
-const float INITIAL_CAM_SCALE = 10.0;
+const float INITIAL_CAM_SCALE = 50.0;
 
+const int NUM_BODIES = 100000;
+const float DT = 0.01;
+const bool COLLISION = false;
+
+const float X_MEAN = NUM_BODIES <= 25000 ? 10.0 : 15.0;
+const float X_STD = NUM_BODIES <= 25000 ? 3.0 : 10.0;
+const float Y_MEAN = 0.0;
+const float Y_STD = NUM_BODIES <= 25000 ? 5.0 : 10.0;
 const float MASS_SUN = 10000.0;
 
-const float X_MEAN = 15.0, X_STD = 12.0;
-const float Y_MEAN = 0.0, Y_STD = 20.0;
-
-const int NUM_BODIES = 10000;
-std::vector<Body> bodies;
-
-void initializeBodies()
-{
-    Body sun = {
-        0.2f,
-        MASS_SUN,
-        {0.0f, 0.0f},
-        {0.0f, 0.0f},
-        {1.0f, 1.0f, 0.0f},
-    };
-
-    bodies.push_back(sun);
-
-    std::random_device rd;
-    std::mt19937 gen(rd());
-
-    // Bimodal distribution
-    // Either on right of sun or left of sun
-    std::normal_distribution<float> x_distribution_1(X_MEAN, X_STD);
-    std::normal_distribution<float> x_distribution_2(-X_MEAN, X_STD);
-    std::bernoulli_distribution mix_x(0.5);
-
-    std::normal_distribution<float> y_distribution(Y_MEAN, Y_STD);
-
-    std::uniform_real_distribution<float> radius_distribution(0.005f, 0.02f);
-    std::uniform_real_distribution<float> density_distribution(0.8f, 2.5f);
-
-    std::uniform_real_distribution<float> speed_multiplier(0.95f, 1.05f);
-
-    for (int i = 0; i < NUM_BODIES; i++)
-    {
-        float radius = radius_distribution(gen);
-        float mass = (density_distribution(gen)) * (radius * radius);
-
-        float x = mix_x(gen) ? x_distribution_1(gen) : x_distribution_2(gen);
-        float y = y_distribution(gen);
-        glm::vec2 position = {x, y};
-
-        glm::vec2 velocity = {0.0f, 0.0f};
-        float distance = std::sqrt(x * x + y * y);
-        if (distance > 0.001)
-        {
-            glm::vec2 perpendicular = glm::normalize(glm::vec2(-y, x));
-            float orbitalSpeed = std::sqrt(MASS_SUN / distance);
-            orbitalSpeed *= speed_multiplier(gen);
-            velocity = orbitalSpeed * perpendicular;
-        }
-
-        Body b = {
-            radius,
-            mass,
-            position,
-            velocity,
-            {1.0f, 1.0f, 1.0f},
-        };
-        bodies.push_back(b);
-    }
-}
-
-void render()
+void render(const std::vector<Body> &bodies)
 {
     for (const auto &body : bodies)
     {
@@ -118,20 +65,30 @@ int main()
         std::cerr << "GLEW Error: " << glewGetErrorString(err) << std::endl;
         return -1;
     }
-
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    initializeBodies();
 
     float camX = 0.0f, camY = 0.0f;
     float camScale = INITIAL_CAM_SCALE;
+    int timeFactor = 1;
+    bool shouldMove = false;
+
+    std::vector<Body> bodies;
+    initializeBodies(bodies, NUM_BODIES);
+    bodies.reserve(NUM_BODIES + 1);
+
+    Simulation sim(NUM_BODIES, DT, bodies);
 
     while (!glfwWindowShouldClose(window))
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
-        controls(window, &camScale, &camX, &camY, INITIAL_CAM_SCALE);
-        render();
-        updatePhysics(bodies, 0.01);
+        controls(window, &camScale, &camX, &camY, INITIAL_CAM_SCALE, &shouldMove);
+
+        if (shouldMove)
+            sim.step();
+        render(bodies);
+
+        // std::cout << bodies.size() << std::endl;
 
         glfwSwapBuffers(window);
         glfwPollEvents();
